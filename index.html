@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add to Calendar</title>
+    <!-- Add your FontAwesome and Moment.js CDN links here -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+
+</head>
+<body>
+
+<div class="add-to-calendar" data-title="Sample Event" data-description="This is a sample event" data-location="Sample Location" data-starttime="2024-04-12 10:00:00" data-endtime="2024-04-12 12:00:00" data-timeformat="YYYY-MM-DD HH:mm:ss">
+    <ul>
+        <li data-type="apple"><i class="fa fa-apple"></i> Apple</li>
+        <li data-type="google"><i class="fa fa-google"></i> Google</li>
+        <li data-type="outlook"><i class="fa fa-windows"></i> Outlook</li>
+        <li data-type="yahoo"><i class="fa fa-yahoo"></i> Yahoo</li>
+    </ul>
+</div>
+<script>
+    document.addEventListener("DOMContentLoaded", function(event) { 
+	AddToCalendar.init();
+});
+    </script>
+<!-- Include your JavaScript code here -->
+<script>
+   (function (root, factory) {
+    if (typeof define === 'function' && define.amd) {
+        define(['moment'], function(moment) {
+            return (root.AddToCalendar = factory(moment));
+        });
+    } else if (typeof exports === 'object') {
+        module.exports = factory(require('moment'));
+    } else {
+        root.AddToCalendar = factory(root.moment);
+    }
+})(typeof global !== 'undefined' ? global : this.window || this.global, function(moment) {
+    
+    'use strict';
+    
+    var AddToCalendar = {};
+    
+    var settings;
+    var defaults = {
+        supports: ["google", "outlook", "yahoo"]
+    }
+    
+    var eventHandler = function(event) {
+        if (event.type === 'click') {
+            handleClick(event);
+        }
+    }
+    
+    var extend = function(a, b) {
+        for(var key in b) {
+            if(b.hasOwnProperty(key)) {
+                a[key] = b[key];
+            }
+        }
+        return a;
+    }
+    
+    var getRandomKey = function() {
+        var crypto = window.crypto || window.msCrypto;
+        var array = new Uint32Array(1);
+        crypto.getRandomValues(array);
+        return new Date().getTime().toString() + "_" + array[0];
+    }
+    
+    var formatTime = function(date, format) {
+        return moment(date, format).utc().format("YYYYMMDDTHHmmss[Z]");
+    }
+
+    var calculateDuration = function(startTime, endTime, format) {
+        var start = moment(startTime, format);
+        var end = moment(endTime, format);
+        return end.diff(start, 'minutes');
+    }
+    
+    var buildUrl = function(type, event) {
+        var calendarUrl = "";
+        
+        switch (type) {
+            case "google":
+                calendarUrl = "https://calendar.google.com/calendar/render";
+                calendarUrl += "?action=TEMPLATE";
+                calendarUrl += "&dates=" + formatTime(event.startTime, event.format);
+                calendarUrl += "/" + formatTime(event.endTime, event.format);
+                calendarUrl += "&location=" + encodeURIComponent(event.location);
+                calendarUrl += "&text=" + encodeURIComponent(event.title);
+                calendarUrl += "&details=" + encodeURIComponent(event.description);
+              break;
+
+            case "yahoo":
+                var duration = calculateDuration(event.startTime, event.endTime, event.format);
+                calendarUrl = "https://calendar.yahoo.com/?v=60&view=d&type=20";
+                calendarUrl += "&title=" + encodeURIComponent(event.title);
+                calendarUrl += "&st=" + formatTime(event.startTime, event.format);
+                calendarUrl += "&dur=" + duration;
+                calendarUrl += "&desc=" + encodeURIComponent(event.description);
+                calendarUrl += "&in_loc=" + encodeURIComponent(event.location);
+              break;
+
+            case "outlook":
+                calendarUrl = "https://outlook.live.com/owa/?rru=addevent";
+                calendarUrl += "&startdt=" + formatTime(event.startTime, event.format);
+                calendarUrl += "&enddt=" + formatTime(event.endTime, event.format);
+                calendarUrl += "&subject=" + encodeURIComponent(event.title);
+                calendarUrl += "&location=" + encodeURIComponent(event.location);
+                calendarUrl += "&body=" + encodeURIComponent(event.description);
+                calendarUrl += "&allday=false";
+                calendarUrl += "&uid=" + getRandomKey();
+                calendarUrl += "&path=/calendar/view/Month";
+              break;
+
+            default:
+                calendarUrl = ["BEGIN:VCALENDAR", "VERSION:2.0", "BEGIN:VEVENT", "URL:" + document.URL, "DTSTART:" + formatTime(event.startTime, event.format), "DTEND:" + formatTime(event.endTime, event.format), "SUMMARY:" + event.title, "DESCRIPTION:" + event.description, "LOCATION:" + event.location, "END:VEVENT", "END:VCALENDAR"].join("\n");
+
+                calendarUrl = encodeURI("data:text/calendar;charset=utf8," + calendarUrl);
+        }
+      
+        return calendarUrl;
+    }
+    
+    var handleClick = function(e) {
+        let element = e.target;
+        let type = element.dataset.type;
+        let event = {
+            'title': element.closest('.add-to-calendar').dataset.title,
+            'description': element.closest('.add-to-calendar').dataset.description,
+            'location': element.closest('.add-to-calendar').dataset.location,
+            'startTime': element.closest('.add-to-calendar').dataset.starttime,
+            'endTime': element.closest('.add-to-calendar').dataset.endtime,
+            'format': element.closest('.add-to-calendar').dataset.timeformat
+        };
+        var link = buildUrl(type, event);
+        if(type == 'google' || type == 'yahoo' || type == 'outlook') {
+            window.open(link, '_blank');
+        } else {
+            window.open(link);
+        }
+    }
+    
+    AddToCalendar.init = function(options) {
+        AddToCalendar.destroy();
+        var addtocalendars = document.querySelectorAll('.add-to-calendar');
+        for (var addtocalendar of addtocalendars) {
+            addtocalendar.addEventListener('click', eventHandler, false);
+        }
+        settings = extend(defaults, options || {});
+    }
+    
+    AddToCalendar.destroy = function() {
+        var addtocalendars = document.querySelectorAll('.add-to-calendar');
+        for (var addtocalendar of addtocalendars) {
+            addtocalendar.removeEventListener("click", eventHandler, false);
+        }
+        settings = null;
+    };
+    
+    return AddToCalendar;
+});
+
+
+</script>
+
+</body>
+</html>
